@@ -28,6 +28,7 @@ class ClientFactory(Protocol):
         *,
         max_upload_bytes: int | None = None,
         transcriber: Transcriber | None = None,
+        database_url: str | None = None,
     ) -> tuple[TestClient, Settings]: ...
 
 
@@ -43,12 +44,14 @@ def make_client(tmp_path: Path) -> Iterator[ClientFactory]:
         *,
         max_upload_bytes: int | None = None,
         transcriber: Transcriber | None = None,
+        database_url: str | None = None,
     ) -> tuple[TestClient, Settings]:
         upload_dir = tmp_path / "uploads"
-        if max_upload_bytes is None:
-            settings = Settings(upload_dir=upload_dir)
-        else:
-            settings = Settings(upload_dir=upload_dir, max_upload_bytes=max_upload_bytes)
+        settings = Settings(upload_dir=upload_dir)
+        if max_upload_bytes is not None:
+            settings.max_upload_bytes = max_upload_bytes
+        if database_url is not None:
+            settings.database_url = database_url
         chosen = transcriber if transcriber is not None else _default_transcriber
         app.dependency_overrides[get_settings] = lambda: settings
         app.dependency_overrides[get_transcriber] = lambda: chosen
