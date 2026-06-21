@@ -1,4 +1,6 @@
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Response, status
@@ -7,7 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from audio import router as audio_router
 from core.config import Settings, get_settings
-from core.database import ping_database
+from core.database import close_database, init_database, ping_database
+from patients import router as patients_router
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +30,18 @@ class ReadinessResponse(BaseModel):
     database: str
 
 
-app = FastAPI(title="SenseiAPI", version="0.1.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    await init_database(settings)
+    yield
+    await close_database(settings.database_url)
+
+
+app = FastAPI(title="SenseiAPI", version="0.1.0", lifespan=lifespan)
 
 app.include_router(audio_router)
+app.include_router(patients_router)
 
 
 @app.get("/", response_model=RootResponse)

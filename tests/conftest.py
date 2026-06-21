@@ -59,3 +59,19 @@ def make_client(tmp_path: Path) -> Iterator[ClientFactory]:
 
     yield _make
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _skip_database_lifecycle_for_unit_tests(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unit tests should not require Postgres during app lifespan startup."""
+    if request.node.get_closest_marker("integration"):
+        return
+
+    async def noop(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr("main.init_database", noop)
+    monkeypatch.setattr("main.close_database", noop)
