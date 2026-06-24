@@ -10,15 +10,24 @@ class PatientService:
     def __init__(self, repository: PatientRepository) -> None:
         self._repository = repository
 
-    async def add_patient(self, *, name: str, phone: str, therapist_id: uuid.UUID) -> Patient:
+    async def add_patient(
+        self,
+        *,
+        name: str,
+        phone: str,
+        email: str | None = None,
+    ) -> Patient:
         return await self._repository.create(
             name=name,
             phone=phone,
-            therapist_id=therapist_id,
+            email=email,
         )
 
-    async def list_patients_by_therapist(self, therapist_id: uuid.UUID) -> list[Patient]:
-        return await self._repository.list_by_therapist(therapist_id)
+    async def list_patients(self) -> list[Patient]:
+        return await self._repository.list_all()
+
+    async def update_patient(self, patient_id: uuid.UUID, updates: dict[str, object]) -> Patient:
+        return await self._repository.update(patient_id, updates)
 
     async def delete_patient(self, patient_id: uuid.UUID) -> None:
         await self._repository.delete(patient_id)

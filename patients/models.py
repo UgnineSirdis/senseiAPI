@@ -16,5 +16,5 @@ class Patient:
     id: uuid.UUID
     name: str
     phone: str
+    email: str | None
     created_at: datetime
-    therapist_id: uuid.UUID

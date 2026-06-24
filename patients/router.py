@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from patients.dependencies import get_patient_service
 from patients.models import PatientNotFoundError
-from patients.schemas import PatientCreate, PatientOut
+from patients.schemas import PatientCreate, PatientOut, PatientUpdate
 from patients.service import PatientService
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ async def add_patient(
         patient = await service.add_patient(
             name=payload.name,
             phone=payload.phone,
-            therapist_id=payload.therapist_id,
+            email=payload.email,
         )
     except SQLAlchemyError as exc:
         logger.error("failed to create patient", exc_info=exc)
@@ -36,11 +36,10 @@ async def add_patient(
 
 @router.get("", response_model=list[PatientOut])
 async def list_patients(
-    therapist_id: uuid.UUID,
     service: PatientService = Depends(get_patient_service),
 ) -> list[PatientOut]:
     try:
-        patients = await service.list_patients_by_therapist(therapist_id)
+        patients = await service.list_patients()
     except SQLAlchemyError as exc:
         logger.error("failed to list patients", exc_info=exc)
         raise HTTPException(
@@ -48,6 +47,31 @@ async def list_patients(
             detail="failed to list patients",
         ) from exc
     return [PatientOut.from_patient(patient) for patient in patients]
+
+
+@router.patch("/{patient_id}", response_model=PatientOut)
+async def update_patient(
+    patient_id: uuid.UUID,
+    payload: PatientUpdate,
+    service: PatientService = Depends(get_patient_service),
+) -> PatientOut:
+    try:
+        patient = await service.update_patient(
+            patient_id,
+            payload.model_dump(exclude_unset=True),
+        )
+    except PatientNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except SQLAlchemyError as exc:
+        logger.error("failed to update patient", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="failed to update patient",
+        ) from exc
+    return PatientOut.from_patient(patient)
 
 
 @router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)

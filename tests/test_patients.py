@@ -11,8 +11,6 @@ from patients.dependencies import get_patient_service
 from patients.models import Patient, PatientNotFoundError
 from tests.conftest import ClientFactory
 
-THERAPIST_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
-OTHER_THERAPIST_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
 PATIENT_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 OTHER_PATIENT_ID = uuid.UUID("55555555-5555-5555-5555-555555555555")
 CREATED_AT = datetime(2026, 6, 17, 12, 0, tzinfo=UTC)
@@ -21,35 +19,59 @@ OTHER_CREATED_AT = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 
 class _FakePatientService:
     def __init__(self) -> None:
-        self._patient_ids = {PATIENT_ID}
+        self._patient_ids = {PATIENT_ID, OTHER_PATIENT_ID}
         self._patients = [
             Patient(
                 id=PATIENT_ID,
                 name="Jane Doe",
                 phone="050-1234567",
+                email="jane@example.com",
                 created_at=CREATED_AT,
-                therapist_id=THERAPIST_ID,
             ),
             Patient(
                 id=OTHER_PATIENT_ID,
                 name="John Smith",
                 phone="052-9876543",
+                email=None,
                 created_at=OTHER_CREATED_AT,
-                therapist_id=OTHER_THERAPIST_ID,
             ),
         ]
 
-    async def add_patient(self, *, name: str, phone: str, therapist_id: uuid.UUID) -> Patient:
+    async def add_patient(
+        self,
+        *,
+        name: str,
+        phone: str,
+        email: str | None = None,
+    ) -> Patient:
         return Patient(
             id=PATIENT_ID,
             name=name,
             phone=phone,
+            email=email,
             created_at=CREATED_AT,
-            therapist_id=therapist_id,
         )
 
-    async def list_patients_by_therapist(self, therapist_id: uuid.UUID) -> list[Patient]:
-        return [patient for patient in self._patients if patient.therapist_id == therapist_id]
+    async def list_patients(self) -> list[Patient]:
+        return list(self._patients)
+
+    async def update_patient(self, patient_id: uuid.UUID, updates: dict[str, object]) -> Patient:
+        for index, patient in enumerate(self._patients):
+            if patient.id != patient_id:
+                continue
+            phone = str(updates["phone"]) if "phone" in updates else patient.phone
+            email_value = updates.get("email", patient.email)
+            email = None if email_value is None else str(email_value)
+            updated = Patient(
+                id=patient.id,
+                name=patient.name,
+                phone=phone,
+                email=email,
+                created_at=patient.created_at,
+            )
+            self._patients[index] = updated
+            return updated
+        raise PatientNotFoundError(patient_id)
 
     async def delete_patient(self, patient_id: uuid.UUID) -> None:
         if patient_id not in self._patient_ids:
@@ -70,7 +92,6 @@ def test_add_patient_returns_201(patient_client: TestClient) -> None:
         json={
             "name": "Jane Doe",
             "phone": "050-1234567",
-            "therapist_id": str(THERAPIST_ID),
         },
     )
     assert res.status_code == 201
@@ -78,22 +99,51 @@ def test_add_patient_returns_201(patient_client: TestClient) -> None:
     assert body["id"] == "22222222-2222-2222-2222-222222222222"
     assert body["name"] == "Jane Doe"
     assert body["phone"] == "050-1234567"
-    assert body["therapist_id"] == str(THERAPIST_ID)
     assert body["created_at"] is not None
+    assert body["email"] is None
+
+
+def test_add_patient_with_email_returns_email(patient_client: TestClient) -> None:
+    res = patient_client.post(
+        "/patients",
+        json={
+            "name": "Jane Doe",
+            "phone": "050-1234567",
+            "email": "jane@example.com",
+        },
+    )
+    assert res.status_code == 201
+    assert res.json()["email"] == "jane@example.com"
+
+
+def test_add_patient_without_email_returns_null(patient_client: TestClient) -> None:
+    res = patient_client.post(
+        "/patients",
+        json={
+            "name": "Jane Doe",
+            "phone": "050-1234567",
+        },
+    )
+    assert res.status_code == 201
+    assert res.json()["email"] is None
+
+
+def test_add_patient_rejects_invalid_email(patient_client: TestClient) -> None:
+    res = patient_client.post(
+        "/patients",
+        json={
+            "name": "Jane Doe",
+            "phone": "050-1234567",
+            "email": "not-an-email",
+        },
+    )
+    assert res.status_code == 422
 
 
 def test_add_patient_rejects_empty_name(patient_client: TestClient) -> None:
     res = patient_client.post(
         "/patients",
-        json={"name": "", "phone": "050-1234567", "therapist_id": str(THERAPIST_ID)},
-    )
-    assert res.status_code == 422
-
-
-def test_add_patient_rejects_invalid_therapist_id(patient_client: TestClient) -> None:
-    res = patient_client.post(
-        "/patients",
-        json={"name": "Jane Doe", "phone": "050-1234567", "therapist_id": "not-a-uuid"},
+        json={"name": "", "phone": "050-1234567"},
     )
     assert res.status_code == 422
 
@@ -115,26 +165,97 @@ def test_delete_patient_rejects_invalid_id(patient_client: TestClient) -> None:
     assert res.status_code == 422
 
 
-def test_list_patients_returns_matching_patients(patient_client: TestClient) -> None:
-    res = patient_client.get("/patients", params={"therapist_id": str(THERAPIST_ID)})
+def test_list_patients_returns_all_patients(patient_client: TestClient) -> None:
+    res = patient_client.get("/patients")
     assert res.status_code == 200
     body = res.json()
-    assert len(body) == 1
+    assert len(body) == 2
     assert body[0]["id"] == str(PATIENT_ID)
     assert body[0]["name"] == "Jane Doe"
-    assert body[0]["therapist_id"] == str(THERAPIST_ID)
+    assert body[0]["email"] == "jane@example.com"
+    assert body[1]["id"] == str(OTHER_PATIENT_ID)
 
 
-def test_list_patients_returns_empty_for_unknown_therapist(patient_client: TestClient) -> None:
-    unknown_id = uuid.UUID("99999999-9999-9999-9999-999999999999")
-    res = patient_client.get("/patients", params={"therapist_id": str(unknown_id)})
+def test_update_patient_phone_returns_200(patient_client: TestClient) -> None:
+    res = patient_client.patch(
+        f"/patients/{PATIENT_ID}",
+        json={"phone": "050-9999999"},
+    )
     assert res.status_code == 200
-    assert res.json() == []
+    body = res.json()
+    assert body["phone"] == "050-9999999"
+    assert body["email"] == "jane@example.com"
 
 
-def test_list_patients_rejects_invalid_therapist_id(patient_client: TestClient) -> None:
-    res = patient_client.get("/patients", params={"therapist_id": "not-a-uuid"})
+def test_update_patient_email_returns_200(patient_client: TestClient) -> None:
+    res = patient_client.patch(
+        f"/patients/{OTHER_PATIENT_ID}",
+        json={"email": "john@example.com"},
+    )
+    assert res.status_code == 200
+    assert res.json()["email"] == "john@example.com"
+
+
+def test_update_patient_clears_email(patient_client: TestClient) -> None:
+    res = patient_client.patch(
+        f"/patients/{PATIENT_ID}",
+        json={"email": None},
+    )
+    assert res.status_code == 200
+    assert res.json()["email"] is None
+
+
+def test_update_patient_missing_returns_404(patient_client: TestClient) -> None:
+    missing_id = uuid.UUID("33333333-3333-3333-3333-333333333333")
+    res = patient_client.patch(
+        f"/patients/{missing_id}",
+        json={"phone": "050-9999999"},
+    )
+    assert res.status_code == 404
+
+
+def test_update_patient_rejects_empty_body(patient_client: TestClient) -> None:
+    res = patient_client.patch(f"/patients/{PATIENT_ID}", json={})
     assert res.status_code == 422
+
+
+def test_update_patient_rejects_invalid_email(patient_client: TestClient) -> None:
+    res = patient_client.patch(
+        f"/patients/{PATIENT_ID}",
+        json={"email": "not-an-email"},
+    )
+    assert res.status_code == 422
+
+
+@pytest.mark.integration
+def test_update_patient_persists_in_database(make_client: ClientFactory) -> None:
+    from tests.database_helpers import get_database_url, prepare_database
+
+    with get_database_url() as database_url:
+        prepare_database(database_url)
+        try:
+            client, _ = make_client(database_url=database_url)
+            create_res = client.post(
+                "/patients",
+                json={
+                    "name": "John Smith",
+                    "phone": "052-9876543",
+                    "email": "john@example.com",
+                },
+            )
+            assert create_res.status_code == 201
+            patient_id = create_res.json()["id"]
+
+            update_res = client.patch(
+                f"/patients/{patient_id}",
+                json={"phone": "050-1111111", "email": "updated@example.com"},
+            )
+            assert update_res.status_code == 200
+            body = update_res.json()
+            assert body["phone"] == "050-1111111"
+            assert body["email"] == "updated@example.com"
+        finally:
+            asyncio.run(close_database(database_url))
 
 
 @pytest.mark.integration
@@ -145,27 +266,21 @@ def test_list_patients_persists_in_database(make_client: ClientFactory) -> None:
         prepare_database(database_url)
         try:
             client, _ = make_client(database_url=database_url)
-            other_therapist_id = uuid.UUID("66666666-6666-6666-6666-666666666666")
 
-            for name, therapist_id in [
-                ("Alice", THERAPIST_ID),
-                ("Bob", THERAPIST_ID),
-                ("Charlie", other_therapist_id),
-            ]:
+            for name in ["Alice", "Bob", "Charlie"]:
                 res = client.post(
                     "/patients",
                     json={
                         "name": name,
                         "phone": "050-0000000",
-                        "therapist_id": str(therapist_id),
                     },
                 )
                 assert res.status_code == 201
 
-            list_res = client.get("/patients", params={"therapist_id": str(THERAPIST_ID)})
+            list_res = client.get("/patients")
             assert list_res.status_code == 200
             names = {patient["name"] for patient in list_res.json()}
-            assert names == {"Alice", "Bob"}
+            assert names == {"Alice", "Bob", "Charlie"}
         finally:
             asyncio.run(close_database(database_url))
 
@@ -183,7 +298,6 @@ def test_delete_patient_persists_in_database(make_client: ClientFactory) -> None
                 json={
                     "name": "John Smith",
                     "phone": "052-9876543",
-                    "therapist_id": str(THERAPIST_ID),
                 },
             )
             assert create_res.status_code == 201
@@ -211,14 +325,13 @@ def test_add_patient_persists_in_database(make_client: ClientFactory) -> None:
                 json={
                     "name": "John Smith",
                     "phone": "052-9876543",
-                    "therapist_id": str(THERAPIST_ID),
                 },
             )
             assert res.status_code == 201
             body = res.json()
             assert body["name"] == "John Smith"
             assert body["phone"] == "052-9876543"
-            assert body["therapist_id"] == str(THERAPIST_ID)
+            assert body["email"] is None
             assert uuid.UUID(body["id"])
         finally:
             asyncio.run(close_database(database_url))
