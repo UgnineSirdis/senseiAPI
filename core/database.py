@@ -42,6 +42,9 @@ SessionDep = Annotated[AsyncSession, Depends(get_db_session)]
 
 async def init_database(settings: Settings) -> None:
     """Create tables for all imported ORM models."""
+    if not settings.database_url:
+        return
+
     import patients.orm  # noqa: F401
 
     engine = get_engine(settings.database_url)

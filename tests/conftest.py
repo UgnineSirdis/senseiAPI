@@ -50,8 +50,7 @@ def make_client(tmp_path: Path) -> Iterator[ClientFactory]:
         settings = Settings(upload_dir=upload_dir)
         if max_upload_bytes is not None:
             settings.max_upload_bytes = max_upload_bytes
-        if database_url is not None:
-            settings.database_url = database_url
+        settings.database_url = database_url
         chosen = transcriber if transcriber is not None else _default_transcriber
         app.dependency_overrides[get_settings] = lambda: settings
         app.dependency_overrides[get_transcriber] = lambda: chosen

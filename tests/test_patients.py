@@ -1,15 +1,14 @@
-import asyncio
 import uuid
 from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
-from core.database import close_database
 from main import app
 from patients.dependencies import get_patient_service
 from patients.models import Patient, PatientNotFoundError
 from tests.conftest import ClientFactory
+from tests.database_helpers import get_database_url
 
 PATIENT_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 OTHER_PATIENT_ID = uuid.UUID("55555555-5555-5555-5555-555555555555")
@@ -229,12 +228,9 @@ def test_update_patient_rejects_invalid_email(patient_client: TestClient) -> Non
 
 @pytest.mark.integration
 def test_update_patient_persists_in_database(make_client: ClientFactory) -> None:
-    from tests.database_helpers import get_database_url, prepare_database
-
     with get_database_url() as database_url:
-        prepare_database(database_url)
-        try:
-            client, _ = make_client(database_url=database_url)
+        client, _ = make_client(database_url=database_url)
+        with client:
             create_res = client.post(
                 "/patients",
                 json={
@@ -254,19 +250,13 @@ def test_update_patient_persists_in_database(make_client: ClientFactory) -> None
             body = update_res.json()
             assert body["phone"] == "050-1111111"
             assert body["email"] == "updated@example.com"
-        finally:
-            asyncio.run(close_database(database_url))
 
 
 @pytest.mark.integration
 def test_list_patients_persists_in_database(make_client: ClientFactory) -> None:
-    from tests.database_helpers import get_database_url, prepare_database
-
     with get_database_url() as database_url:
-        prepare_database(database_url)
-        try:
-            client, _ = make_client(database_url=database_url)
-
+        client, _ = make_client(database_url=database_url)
+        with client:
             for name in ["Alice", "Bob", "Charlie"]:
                 res = client.post(
                     "/patients",
@@ -281,18 +271,13 @@ def test_list_patients_persists_in_database(make_client: ClientFactory) -> None:
             assert list_res.status_code == 200
             names = {patient["name"] for patient in list_res.json()}
             assert names == {"Alice", "Bob", "Charlie"}
-        finally:
-            asyncio.run(close_database(database_url))
 
 
 @pytest.mark.integration
 def test_delete_patient_persists_in_database(make_client: ClientFactory) -> None:
-    from tests.database_helpers import get_database_url, prepare_database
-
     with get_database_url() as database_url:
-        prepare_database(database_url)
-        try:
-            client, _ = make_client(database_url=database_url)
+        client, _ = make_client(database_url=database_url)
+        with client:
             create_res = client.post(
                 "/patients",
                 json={
@@ -308,18 +293,13 @@ def test_delete_patient_persists_in_database(make_client: ClientFactory) -> None
 
             delete_again_res = client.delete(f"/patients/{patient_id}")
             assert delete_again_res.status_code == 404
-        finally:
-            asyncio.run(close_database(database_url))
 
 
 @pytest.mark.integration
 def test_add_patient_persists_in_database(make_client: ClientFactory) -> None:
-    from tests.database_helpers import get_database_url, prepare_database
-
     with get_database_url() as database_url:
-        prepare_database(database_url)
-        try:
-            client, _ = make_client(database_url=database_url)
+        client, _ = make_client(database_url=database_url)
+        with client:
             res = client.post(
                 "/patients",
                 json={
@@ -333,5 +313,3 @@ def test_add_patient_persists_in_database(make_client: ClientFactory) -> None:
             assert body["phone"] == "052-9876543"
             assert body["email"] is None
             assert uuid.UUID(body["id"])
-        finally:
-            asyncio.run(close_database(database_url))

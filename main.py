@@ -32,7 +32,8 @@ class ReadinessResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = get_settings()
+    settings_factory = app.dependency_overrides.get(get_settings, get_settings)
+    settings = settings_factory()
     await init_database(settings)
     yield
     await close_database(settings.database_url)

@@ -1,4 +1,3 @@
-import asyncio
 import shutil
 import subprocess
 from collections.abc import Iterator
@@ -6,9 +5,6 @@ from contextlib import contextmanager
 
 import pytest
 from testcontainers.postgres import PostgresContainer
-
-from core.config import Settings
-from core.database import init_database
 
 POSTGRES_IMAGE = "postgres:16-alpine"
 DOCKER_UNAVAILABLE_MESSAGE = (
@@ -37,7 +33,3 @@ def get_database_url() -> Iterator[str]:
 
     with PostgresContainer(POSTGRES_IMAGE, driver="asyncpg") as postgres:
         yield str(postgres.get_connection_url())
-
-
-def prepare_database(database_url: str) -> None:
-    asyncio.run(init_database(Settings(database_url=database_url)))
