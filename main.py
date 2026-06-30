@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
 from audio import router as audio_router
+from calendar_events import router as calendar_router
 from core.config import Settings, get_settings
 from core.database import close_database, init_database, ping_database
 from patients import router as patients_router
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="SenseiAPI", version="0.1.0", lifespan=lifespan)
 
 app.include_router(audio_router)
+app.include_router(calendar_router)
 app.include_router(patients_router)
 
 
