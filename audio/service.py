@@ -19,20 +19,31 @@ class AudioService:
 
     async def upload_and_transcribe(self, file: UploadFile) -> tuple[SavedAudio, Transcript]:
         saved = await self._loader.save(file)
-        transcript = await self._transcriber.transcribe(
-            data=saved.data,
-            filename=saved.filename,
-            language=self._language,
-        )
+        try:
+            transcript = await self._transcriber.transcribe(
+                data=saved.data,
+                filename=saved.filename,
+                language=self._language,
+            )
+        except Exception:
+            # Keep the file on transcription failure so the client can retry.
+            raise
+        await self._loader.delete(saved.id)
         return saved, transcript
 
     async def transcribe(self, audio_id: str) -> Transcript:
         filename, data = await self._loader.read(audio_id)
-        return await self._transcriber.transcribe(
-            data=data,
-            filename=filename,
-            language=self._language,
-        )
+        try:
+            transcript = await self._transcriber.transcribe(
+                data=data,
+                filename=filename,
+                language=self._language,
+            )
+        except Exception:
+            # Keep the file on transcription failure so the client can retry.
+            raise
+        await self._loader.delete(audio_id)
+        return transcript
 
     async def list_files(self) -> Sequence[StoredAudioFile]:
         return await self._loader.list_files()

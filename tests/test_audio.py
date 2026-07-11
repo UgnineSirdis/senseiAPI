@@ -12,7 +12,9 @@ from transcripts.models import (
 from transcripts.service import TranscriptService
 
 
-def test_upload_audio_returns_201_and_persists_file(make_client: ClientFactory) -> None:
+def test_upload_audio_returns_201_and_deletes_file_after_transcript(
+    make_client: ClientFactory,
+) -> None:
     client, settings = make_client()
     content = b"ID3 fake-audio-bytes"
     res = client.post(
@@ -25,10 +27,10 @@ def test_upload_audio_returns_201_and_persists_file(make_client: ClientFactory) 
     assert body["content_type"] == "audio/mpeg"
     assert body["size_bytes"] == len(content)
     assert body["id"].endswith(".mp3")
+    assert body["text"] == DEFAULT_TRANSCRIPT
 
     stored = settings.upload_dir / body["id"]
-    assert stored.exists()
-    assert stored.read_bytes() == content
+    assert not stored.exists()
 
 
 def test_upload_audio_returns_transcript(make_client: ClientFactory) -> None:
@@ -97,26 +99,24 @@ def test_list_audio_is_empty_initially(make_client: ClientFactory) -> None:
     assert res.json() == []
 
 
-def test_list_audio_returns_uploaded_files(make_client: ClientFactory) -> None:
+def test_list_audio_returns_empty_after_upload_deletes_file(make_client: ClientFactory) -> None:
     client, _ = make_client()
-    uploaded = client.post(
+    client.post(
         "/audio/upload",
         files={"file": ("song.mp3", b"abc", "audio/mpeg")},
-    ).json()
+    )
     res = client.get("/audio")
     assert res.status_code == 200
-    body = res.json()
-    assert body == [{"id": uploaded["id"], "size_bytes": 3}]
+    assert res.json() == []
 
 
 def test_download_audio_returns_content(make_client: ClientFactory) -> None:
-    client, _ = make_client()
+    client, settings = make_client()
     content = b"fake-audio-content"
-    uploaded = client.post(
-        "/audio/upload",
-        files={"file": ("song.mp3", content, "audio/mpeg")},
-    ).json()
-    res = client.get(f"/audio/{uploaded['id']}")
+    audio_id = "seeded-song.mp3"
+    settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    (settings.upload_dir / audio_id).write_bytes(content)
+    res = client.get(f"/audio/{audio_id}")
     assert res.status_code == 200
     assert res.content == content
     assert res.headers["content-type"].startswith("audio/mpeg")
@@ -136,11 +136,9 @@ def test_download_audio_rejects_path_traversal(make_client: ClientFactory) -> No
 
 def test_delete_audio_returns_204_then_404(make_client: ClientFactory) -> None:
     client, settings = make_client()
-    uploaded = client.post(
-        "/audio/upload",
-        files={"file": ("song.mp3", b"abc", "audio/mpeg")},
-    ).json()
-    audio_id = uploaded["id"]
+    audio_id = "seeded-song.mp3"
+    settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    (settings.upload_dir / audio_id).write_bytes(b"abc")
 
     assert client.delete(f"/audio/{audio_id}").status_code == 204
     assert not (settings.upload_dir / audio_id).exists()
