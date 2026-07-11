@@ -6,6 +6,10 @@ Cursor users: the same rules live in `.cursor/rules/` and apply automatically.
 ## Project
 - FastAPI service (Python 3.11+). Entry point: `main.py`.
 - Dependencies in `requirements.txt`; dev/test tools in `requirements-dev.txt`.
+- Transcription has two interchangeable backends behind the `Transcriber` ABC, picked by
+  `TRANSCRIBER_BACKEND`: `elevenlabs` (default, hosted, needs `ELEVENLABS_API_KEY`) and
+  `whisper` (local `faster-whisper`). Both must return the same `Transcript` shape.
+  Never let tests hit the real ElevenLabs API — inject a fake client.
 
 ## Setup
 ```bash

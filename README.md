@@ -25,6 +25,21 @@ cp .env.example .env
 > `requirements-dev.txt` includes everything in `requirements.txt` plus the test/lint tools.
 > For a production install, use `pip install -r requirements.txt`.
 
+## Transcription
+
+Speech-to-text runs through one of two backends, chosen by `TRANSCRIBER_BACKEND`:
+
+| Backend | Value | Notes |
+| --- | --- | --- |
+| ElevenLabs Scribe | `elevenlabs` (default) | Hosted API. Needs `ELEVENLABS_API_KEY`; billed per minute of audio. |
+| Local Whisper | `whisper` | Runs `faster-whisper` in-process. Free and offline, slower on CPU. |
+
+Both return the same shape — text, detected language, and word-level timestamps —
+so switching backends never changes the API response.
+
+Startup fails if `TRANSCRIBER_BACKEND=elevenlabs` and no API key is set, rather
+than silently downgrading to Whisper.
+
 ## Local database
 
 Start PostgreSQL with Docker Compose:

@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from tests.conftest import ClientFactory
-from transcription.models import Transcript, TranscriptionFailedError
+from transcription.models import Transcript, TranscriptionFailedError, Word
 from transcription.transcriber import Transcriber
 
 HEBREW_TEXT = "שלום, זאת הקלטת בדיקה."
@@ -36,7 +36,26 @@ def test_transcribe_returns_hebrew_text(make_client: ClientFactory) -> None:
     res = client.post(f"/audio/{audio_id}/transcribe")
     assert res.status_code == 200
     body = res.json()
-    assert body == {"id": audio_id, "language": "he", "text": HEBREW_TEXT}
+    assert body == {"id": audio_id, "language": "he", "text": HEBREW_TEXT, "words": []}
+
+
+class _WordTimestampTranscriber(Transcriber):
+    async def transcribe(self, *, data: bytes, filename: str, language: str) -> Transcript:
+        return Transcript(
+            text=HEBREW_TEXT,
+            language=language,
+            words=(Word(text="שלום", start=0.0, end=0.4),),
+        )
+
+
+def test_transcribe_returns_word_timestamps(make_client: ClientFactory) -> None:
+    client, _ = make_client(transcriber=_WordTimestampTranscriber())
+    audio_id = _upload(client)
+
+    res = client.post(f"/audio/{audio_id}/transcribe")
+
+    assert res.status_code == 200
+    assert res.json()["words"] == [{"text": "שלום", "start": 0.0, "end": 0.4}]
 
 
 def test_transcribe_missing_audio_returns_404(make_client: ClientFactory) -> None:

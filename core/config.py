@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,6 +23,13 @@ class Settings(BaseSettings):
 
     # Comma-separated browser origins allowed to call the API (e.g. the Vite frontend).
     cors_origins: str = ""
+
+    # Which speech-to-text engine serves transcription requests.
+    transcriber_backend: Literal["elevenlabs", "whisper"] = "elevenlabs"
+
+    # ElevenLabs Speech-to-Text (Scribe). Required when the backend is "elevenlabs".
+    elevenlabs_api_key: str | None = None
+    elevenlabs_model: str = "scribe_v2"
 
     # Whisper transcription (local, via faster-whisper; no API key needed).
     whisper_model: str = "small"  # tiny|base|small|medium|large-v3 (or a local path)
