@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     whisper_device: str = "cpu"  # "cpu", "cuda", or "auto"
     whisper_compute_type: str = "int8"  # e.g. int8, int8_float16, float16, float32
     transcribe_language: str = "he"  # ISO-639-1; Hebrew by default
+
+    # Session summaries, generated locally by Ollama so transcripts (PHI) never leave the host.
+    summary_enabled: bool = True
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:7b-instruct"
+    # Ollama defaults num_ctx to 2048 and silently truncates longer input, which would
+    # summarise only the opening minutes of a session. Set it explicitly.
+    ollama_num_ctx: int = 32768
+    ollama_timeout_seconds: int = 600
+    # Conservative character budget for the context window above. Hebrew tokenizes less
+    # efficiently than English, so this errs toward failing early rather than truncating.
+    max_transcript_chars: int = 40_000
     allowed_audio_types: tuple[str, ...] = (
         "audio/mpeg",
         "audio/mp3",

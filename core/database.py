@@ -37,7 +37,20 @@ async def get_db_session(settings: SettingsDep) -> AsyncGenerator[AsyncSession]:
         yield session
 
 
+async def get_optional_db_session(
+    settings: SettingsDep,
+) -> AsyncGenerator[AsyncSession | None]:
+    """Yield a DB session when configured; otherwise ``None`` (unit tests / no Postgres)."""
+    if not settings.database_url:
+        yield None
+        return
+    sessionmaker = get_sessionmaker(settings.database_url)
+    async with sessionmaker() as session:
+        yield session
+
+
 SessionDep = Annotated[AsyncSession, Depends(get_db_session)]
+OptionalSessionDep = Annotated[AsyncSession | None, Depends(get_optional_db_session)]
 
 
 async def init_database(settings: Settings) -> None:
@@ -47,6 +60,8 @@ async def init_database(settings: Settings) -> None:
 
     import calendar_events.orm  # noqa: F401
     import patients.orm  # noqa: F401
+    import summaries.orm  # noqa: F401
+    import transcripts.orm  # noqa: F401
 
     engine = get_engine(settings.database_url)
     async with engine.begin() as conn:
