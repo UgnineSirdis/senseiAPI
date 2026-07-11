@@ -16,9 +16,7 @@ class TranscriptPatientMismatchError(Exception):
     """Raised when form patient_id does not match the calendar event's patient."""
 
     def __init__(self, meeting_id: uuid.UUID, patient_id: uuid.UUID) -> None:
-        super().__init__(
-            f"patient {patient_id!r} does not match calendar event {meeting_id!r}"
-        )
+        super().__init__(f"patient {patient_id!r} does not match calendar event {meeting_id!r}")
         self.meeting_id = meeting_id
         self.patient_id = patient_id
 

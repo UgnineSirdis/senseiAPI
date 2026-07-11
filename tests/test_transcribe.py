@@ -7,7 +7,9 @@ from transcription.transcriber import Transcriber
 HEBREW_TEXT = "שלום, זאת הקלטת בדיקה."
 
 
-def _seed_audio(upload_dir: Path, *, name: str = "voice.m4a", content: bytes = b"fake-audio-bytes") -> str:
+def _seed_audio(
+    upload_dir: Path, *, name: str = "voice.m4a", content: bytes = b"fake-audio-bytes"
+) -> str:
     upload_dir.mkdir(parents=True, exist_ok=True)
     (upload_dir / name).write_bytes(content)
     return name

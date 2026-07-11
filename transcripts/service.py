@@ -8,7 +8,11 @@ from calendar_events.models import CalendarEventNotFoundError
 from calendar_events.orm import CalendarEventRecord
 from patients.models import PatientNotFoundError
 from patients.orm import PatientRecord
-from transcripts.models import StoredTranscript, TranscriptAlreadyExistsError, TranscriptPatientMismatchError
+from transcripts.models import (
+    StoredTranscript,
+    TranscriptAlreadyExistsError,
+    TranscriptPatientMismatchError,
+)
 from transcripts.orm import TranscriptRecord
 from transcripts.repository import to_transcript
 
