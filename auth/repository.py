@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Callable
 
+from pydantic import EmailStr, SecretStr
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +28,9 @@ def _to_user(record: UserRecord) -> AuthUser:
     )
 
 
-def _to_credentials(record: UserRecord) -> UserCredentials:
+def _to_credentials(record: UserRecord) -> UserCredentials | None:
+    if record.password_hash is None:
+        return None
     return UserCredentials(
         user=_to_user(record),
         password_hash=record.password_hash,
@@ -46,7 +49,7 @@ class UserRepository:
         )
         return result.scalar_one_or_none() is not None
 
-    async def get_credentials_by_email(self, email: str) -> UserCredentials | None:
+    async def get_credentials_by_email(self, email: EmailStr) -> UserCredentials | None:
         result = await self._session.execute(
             select(UserRecord).where(UserRecord.email == email).limit(1)
         )
@@ -68,9 +71,9 @@ class UserRepository:
         self,
         *,
         user_id: uuid.UUID,
-        current_password: str,
+        current_password: SecretStr,
         new_password_hash: str,
-        password_matches: Callable[[str, str], bool],
+        password_matches: Callable[[SecretStr, str], bool],
     ) -> AuthUser | None:
         async with self._session.begin():
             result = await self._session.execute(
@@ -78,6 +81,8 @@ class UserRepository:
             )
             record = result.scalar_one_or_none()
             if record is None:
+                return None
+            if record.password_hash is None:
                 return None
             if not password_matches(current_password, record.password_hash):
                 return None
@@ -106,7 +111,7 @@ class UserRepository:
         password_hash: str,
         auth_type: AuthType,
         role: UserRole,
-        email: str,
+        email: EmailStr,
         full_name: str | None = None,
     ) -> AuthUser:
         record = UserRecord(

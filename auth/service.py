@@ -2,6 +2,7 @@ import uuid
 
 from pwdlib import PasswordHash
 from pwdlib.exceptions import UnknownHashError
+from pydantic import EmailStr, SecretStr
 
 from auth.models import AuthType, AuthUser, InvalidCredentialsError, UserRole
 from auth.repository import UserRepository
@@ -9,13 +10,13 @@ from auth.repository import UserRepository
 PASSWORD_HASH = PasswordHash.recommended()
 
 
-def hash_password(password: str) -> str:
-    return PASSWORD_HASH.hash(password)
+def hash_password(password: SecretStr) -> str:
+    return PASSWORD_HASH.hash(password.get_secret_value())
 
 
-def verify_password(password: str, password_hash: str) -> bool:
+def verify_password(password: SecretStr, password_hash: str) -> bool:
     try:
-        return PASSWORD_HASH.verify(password, password_hash)
+        return PASSWORD_HASH.verify(password.get_secret_value(), password_hash)
     except (TypeError, UnknownHashError):
         return False
 
@@ -29,10 +30,10 @@ class UserService:
     async def register_user(
         self,
         *,
-        password: str,
+        password: SecretStr,
         auth_type: AuthType,
         role: UserRole,
-        email: str,
+        email: EmailStr,
         full_name: str | None = None,
     ) -> AuthUser:
         return await self._repository.create(
@@ -43,7 +44,7 @@ class UserService:
             full_name=full_name,
         )
 
-    async def authenticate_user(self, *, email: str, password: str) -> AuthUser:
+    async def authenticate_user(self, *, email: EmailStr, password: SecretStr) -> AuthUser:
         credentials = await self._repository.get_credentials_by_email(email)
         if credentials is None:
             # Work the same time to prevent timing attacks
@@ -60,8 +61,8 @@ class UserService:
         self,
         *,
         user_id: uuid.UUID,
-        current_password: str,
-        new_password: str,
+        current_password: SecretStr,
+        new_password: SecretStr,
     ) -> AuthUser:
         updated_user = await self._repository.update_password(
             user_id=user_id,

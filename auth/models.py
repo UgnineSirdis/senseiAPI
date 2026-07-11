@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from pydantic import EmailStr
+
 
 class AuthType(StrEnum):
     PASSWORD = "password"
@@ -31,7 +33,7 @@ class AuthUser:
     user_id: uuid.UUID
     auth_type: AuthType
     role: UserRole
-    email: str
+    email: EmailStr | None
     full_name: str | None
     created_at: datetime
     token_version: int

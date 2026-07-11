@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from pydantic import EmailStr
+
 
 class PatientNotFoundError(Exception):
     """Raised when a requested patient does not exist."""
@@ -16,5 +18,5 @@ class Patient:
     id: uuid.UUID
     name: str
     phone: str
-    email: str | None
+    email: EmailStr | None
     created_at: datetime

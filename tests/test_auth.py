@@ -6,6 +6,7 @@ from typing import cast
 
 import pytest
 from fastapi import HTTPException
+from pydantic import EmailStr, SecretStr
 
 import auth.service as auth_service
 from auth.dependencies import get_user_service
@@ -78,16 +79,16 @@ def test_create_access_token_uses_user_id_as_subject() -> None:
 
 class _FakeUserService:
     def __init__(self) -> None:
-        self._password = "strong-password"
+        self._password = SecretStr("strong-password")
         self._token_version = 0
 
     async def register_user(
         self,
         *,
-        password: str,
+        password: SecretStr,
         auth_type: AuthType,
         role: UserRole,
-        email: str,
+        email: EmailStr,
         full_name: str | None = None,
     ) -> AuthUser:
         if email == "existing@example.com":
@@ -103,7 +104,7 @@ class _FakeUserService:
             token_version=self._token_version,
         )
 
-    async def authenticate_user(self, *, email: str, password: str) -> AuthUser:
+    async def authenticate_user(self, *, email: EmailStr, password: SecretStr) -> AuthUser:
         if email != "newuser@example.com" or password != self._password:
             raise InvalidCredentialsError()
         return AuthUser(
@@ -133,8 +134,8 @@ class _FakeUserService:
         self,
         *,
         user_id: uuid.UUID,
-        current_password: str,
-        new_password: str,
+        current_password: SecretStr,
+        new_password: SecretStr,
     ) -> AuthUser:
         if user_id != USER_ID or current_password != self._password:
             raise InvalidCredentialsError()
@@ -570,12 +571,19 @@ def test_issue_token_rejects_bad_credentials(make_client: ClientFactory) -> None
     assert res.json() == {"detail": "Not authenticated"}
 
 
+def test_password_hash_uses_secret_value() -> None:
+    password_hash = auth_service.hash_password(SecretStr("strong-password"))
+
+    assert auth_service.verify_password(SecretStr("strong-password"), password_hash)
+    assert not auth_service.verify_password(SecretStr("wrong-password"), password_hash)
+
+
 def test_authenticate_unknown_user_hashes_password(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[str] = []
+    calls: list[SecretStr] = []
 
-    def fake_hash_password(password: str) -> str:
+    def fake_hash_password(password: SecretStr) -> str:
         calls.append(password)
         return "irrelevant"
 
@@ -583,9 +591,13 @@ def test_authenticate_unknown_user_hashes_password(
     service = auth_service.UserService(cast(UserRepository, _MissingUserRepository()))
 
     with pytest.raises(InvalidCredentialsError):
-        asyncio.run(service.authenticate_user(email="missing@example.com", password="bad-password"))
+        asyncio.run(
+            service.authenticate_user(
+                email="missing@example.com", password=SecretStr("bad-password")
+            )
+        )
 
-    assert calls == ["bad-password"]
+    assert calls == [SecretStr("bad-password")]
 
 
 def test_issue_token_requires_secret_key(make_client: ClientFactory) -> None:

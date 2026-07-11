@@ -5,6 +5,7 @@ from typing import Annotated
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import EmailStr, SecretStr
 from sqlalchemy.exc import SQLAlchemyError
 
 from auth.dependencies import get_user_service
@@ -31,7 +32,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 @dataclass(frozen=True)
 class TokenClaims:
     user_id: uuid.UUID
-    email: str
+    email: EmailStr
     full_name: str | None
     token_version: int
 
@@ -153,7 +154,7 @@ async def issue_token(
         email = validate_email(form.username, check_deliverability=False).normalized.lower()
         user = await service.authenticate_user(
             email=email,
-            password=form.password,
+            password=SecretStr(form.password),
         )
     except EmailNotValidError:
         raise _not_authenticated() from None
