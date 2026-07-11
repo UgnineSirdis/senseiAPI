@@ -2,8 +2,10 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
-from main import app
 from calendar_events.models import CalendarEventNotFoundError
+from main import app
+from summaries.repository import SummaryRepository
+from summaries.service import SummaryService
 from tests.conftest import DEFAULT_TRANSCRIPT, ClientFactory
 from transcripts.models import (
     StoredTranscript,
@@ -200,6 +202,8 @@ def test_upload_with_meeting_persists_via_transcript_service(
     )
     mock_save = AsyncMock(return_value=saved)
     monkeypatch.setattr(TranscriptService, "save_for_upload", mock_save)
+    monkeypatch.setattr(SummaryRepository, "create_pending", AsyncMock())
+    monkeypatch.setattr(SummaryService, "generate", AsyncMock())
 
     _override_db_session()
     try:
@@ -224,6 +228,44 @@ def test_upload_with_meeting_persists_via_transcript_service(
     assert kwargs["meeting_id"] == meeting_id
     assert kwargs["patient_id"] == patient_id
     assert kwargs["raw_text"] == DEFAULT_TRANSCRIPT
+
+
+def test_upload_schedules_a_summary_and_marks_it_pending(
+    make_client: ClientFactory,
+    monkeypatch,
+) -> None:
+    """The pending row is written during the request, not by the background job: a client
+    polling in the gap would otherwise get a 404 for a summary that is on its way."""
+    meeting_id = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    saved = StoredTranscript(
+        id=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+        meeting_id=meeting_id,
+        raw_text=DEFAULT_TRANSCRIPT,
+        diarized_segments=[],
+        language="he",
+        created_at=datetime(2026, 7, 11, 12, 0, tzinfo=UTC),
+    )
+    monkeypatch.setattr(TranscriptService, "save_for_upload", AsyncMock(return_value=saved))
+
+    mock_pending = AsyncMock()
+    monkeypatch.setattr(SummaryRepository, "create_pending", mock_pending)
+    mock_generate = AsyncMock()
+    monkeypatch.setattr(SummaryService, "generate", mock_generate)
+
+    _override_db_session()
+    try:
+        client, _ = make_client()
+        res = client.post(
+            "/audio/upload",
+            files={"file": ("song.mp3", b"fake-audio-bytes", "audio/mpeg")},
+            data={"meeting_id": str(meeting_id)},
+        )
+    finally:
+        _clear_db_override()
+
+    assert res.status_code == 201
+    mock_pending.assert_awaited_once_with(meeting_id)
+    mock_generate.assert_awaited_once_with(meeting_id)
 
 
 def test_upload_unknown_meeting_returns_404(make_client: ClientFactory, monkeypatch) -> None:

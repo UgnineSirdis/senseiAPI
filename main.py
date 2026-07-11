@@ -13,6 +13,8 @@ from calendar_events import router as calendar_router
 from core.config import Settings, get_settings
 from core.database import close_database, init_database, ping_database
 from patients import router as patients_router
+from summaries import router as summaries_router
+from summaries.service import sweep_interrupted_summaries
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings_factory = app.dependency_overrides.get(get_settings, get_settings)
     settings = settings_factory()
     await init_database(settings)
+    await sweep_interrupted_summaries(settings)
     yield
     await close_database(settings.database_url)
 
@@ -58,6 +61,7 @@ if _cors_origins:
 app.include_router(audio_router)
 app.include_router(calendar_router)
 app.include_router(patients_router)
+app.include_router(summaries_router)
 
 
 @app.get("/", response_model=RootResponse)

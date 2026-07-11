@@ -60,6 +60,7 @@ async def init_database(settings: Settings) -> None:
 
     import calendar_events.orm  # noqa: F401
     import patients.orm  # noqa: F401
+    import summaries.orm  # noqa: F401
     import transcripts.orm  # noqa: F401
 
     engine = get_engine(settings.database_url)
