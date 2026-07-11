@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 25 * 1024 * 1024  # 25 MiB
     database_url: str | None = "postgresql+asyncpg://sensei:sensei@localhost:5432/senseiapi"
 
+    # Comma-separated browser origins allowed to call the API (e.g. the Vite frontend).
+    cors_origins: str = ""
+
     # Whisper transcription (local, via faster-whisper; no API key needed).
     whisper_model: str = "small"  # tiny|base|small|medium|large-v3 (or a local path)
     whisper_device: str = "cpu"  # "cpu", "cuda", or "auto"

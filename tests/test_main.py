@@ -54,6 +54,14 @@ def test_settings_reads_database_url_from_environment(monkeypatch: pytest.Monkey
     assert settings.database_url == database_url
 
 
+def test_settings_reads_cors_origins_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:3110,http://127.0.0.1:3110")
+
+    settings = Settings()
+
+    assert settings.cors_origins == "http://localhost:3110,http://127.0.0.1:3110"
+
+
 def test_unknown_route_returns_404() -> None:
     res = client.get("/does-not-exist")
     assert res.status_code == 404

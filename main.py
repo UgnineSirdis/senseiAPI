@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -41,6 +42,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="SenseiAPI", version="0.1.0", lifespan=lifespan)
+
+_cors_origins = [
+    origin.strip()
+    for origin in get_settings().cors_origins.split(",")
+    if origin.strip()
+]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(audio_router)
 app.include_router(calendar_router)
