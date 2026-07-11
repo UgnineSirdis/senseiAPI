@@ -40,3 +40,7 @@ dist/
 .idea/
 *.swp
 .DS_Store
+
+# Claude Code (local agent config and skills)
+.claude/
+docs/master/
