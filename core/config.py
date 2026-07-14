@@ -4,8 +4,6 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-MIN_AUTH_TOKEN_SECRET_BYTES = 32
-
 
 class Settings(BaseSettings):
     """Application configuration loaded from the environment.
@@ -66,8 +64,15 @@ class Settings(BaseSettings):
         "audio/webm",
     )
     enable_security: bool = False
-    auth_token_secret_key: str | None = None
-    auth_token_ttl_seconds: int = 60 * 60 * 24 * 30
+
+    # Supabase Auth. Required when ENABLE_SECURITY=true.
+    supabase_url: str | None = None
+    supabase_anon_key: str | None = None
+    supabase_jwt_audience: str = "authenticated"
+    supabase_auth_timeout_seconds: float = 10.0
+    supabase_jwks_ttl_seconds: int = 60 * 10
+    supabase_email_redirect_to: str | None = None
+    supabase_oauth_redirect_to: str | None = None
 
 
 class SettingsConfigurationError(RuntimeError):
@@ -76,17 +81,16 @@ class SettingsConfigurationError(RuntimeError):
 
 def validate_startup_settings(settings: Settings) -> None:
     if settings.enable_security:
-        if not settings.auth_token_secret_key:
+        if not settings.supabase_url:
+            raise SettingsConfigurationError("SUPABASE_URL must be set when ENABLE_SECURITY=true")
+        if not settings.supabase_anon_key:
             raise SettingsConfigurationError(
-                "AUTH_TOKEN_SECRET_KEY must be set when ENABLE_SECURITY=true"
+                "SUPABASE_ANON_KEY must be set when ENABLE_SECURITY=true"
             )
-        secret_size = len(settings.auth_token_secret_key.encode("utf-8"))
-        if secret_size < MIN_AUTH_TOKEN_SECRET_BYTES:
-            raise SettingsConfigurationError(
-                f"AUTH_TOKEN_SECRET_KEY must be at least {MIN_AUTH_TOKEN_SECRET_BYTES} bytes"
-            )
-        if settings.auth_token_ttl_seconds <= 0:
-            raise SettingsConfigurationError("AUTH_TOKEN_TTL_SECONDS must be positive")
+        if settings.supabase_auth_timeout_seconds <= 0:
+            raise SettingsConfigurationError("SUPABASE_AUTH_TIMEOUT_SECONDS must be positive")
+        if settings.supabase_jwks_ttl_seconds <= 0:
+            raise SettingsConfigurationError("SUPABASE_JWKS_TTL_SECONDS must be positive")
 
 
 @lru_cache

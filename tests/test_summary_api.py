@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
+from core.config import Settings, get_settings
 from main import app
 from summaries.dependencies import get_summary_reader
 from summaries.models import StoredSummary, SummaryStatus
@@ -36,6 +37,7 @@ class _FakeReader:
 
 
 def _client(summary: StoredSummary | None) -> TestClient:
+    app.dependency_overrides[get_settings] = lambda: Settings(enable_security=False)
     app.dependency_overrides[get_summary_reader] = lambda: _FakeReader(summary)
     return TestClient(app)
 

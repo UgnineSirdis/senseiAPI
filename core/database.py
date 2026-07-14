@@ -58,7 +58,6 @@ async def init_database(settings: Settings) -> None:
     if not settings.database_url:
         return
 
-    import auth.orm  # noqa: F401
     import calendar_events.orm  # noqa: F401
     import patients.orm  # noqa: F401
     import summaries.orm  # noqa: F401

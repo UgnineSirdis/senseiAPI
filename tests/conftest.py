@@ -26,12 +26,12 @@ class ClientFactory(Protocol):
     def __call__(
         self,
         *,
-        auth_token_secret_key: str | None = None,
-        auth_token_ttl_seconds: int | None = None,
         enable_security: bool | None = None,
         max_upload_bytes: int | None = None,
         transcriber: Transcriber | None = None,
         database_url: str | None = None,
+        supabase_url: str | None = None,
+        supabase_anon_key: str | None = None,
     ) -> tuple[TestClient, Settings]: ...
 
 
@@ -45,24 +45,20 @@ def make_client(tmp_path: Path) -> Iterator[ClientFactory]:
 
     def _make(
         *,
-        auth_token_secret_key: str | None = None,
-        auth_token_ttl_seconds: int | None = None,
         enable_security: bool | None = None,
         max_upload_bytes: int | None = None,
         transcriber: Transcriber | None = None,
         database_url: str | None = None,
+        supabase_url: str | None = None,
+        supabase_anon_key: str | None = None,
     ) -> tuple[TestClient, Settings]:
         upload_dir = tmp_path / "uploads"
         settings = Settings(upload_dir=upload_dir)
-        if auth_token_secret_key is not None:
-            settings.auth_token_secret_key = auth_token_secret_key
-            settings.enable_security = True
-        elif enable_security is not None:
-            settings.enable_security = enable_security
-        if auth_token_ttl_seconds is not None:
-            settings.auth_token_ttl_seconds = auth_token_ttl_seconds
+        settings.enable_security = enable_security if enable_security is not None else False
         if max_upload_bytes is not None:
             settings.max_upload_bytes = max_upload_bytes
+        settings.supabase_url = supabase_url or "https://example.supabase.co"
+        settings.supabase_anon_key = supabase_anon_key or "test-anon-key"
         settings.database_url = database_url
         chosen = transcriber if transcriber is not None else _default_transcriber
         app.dependency_overrides[get_settings] = lambda: settings

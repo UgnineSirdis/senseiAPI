@@ -62,28 +62,33 @@ def test_settings_reads_cors_origins_from_environment(monkeypatch: pytest.Monkey
     assert settings.cors_origins == "http://localhost:3110,http://127.0.0.1:3110"
 
 
-def test_startup_settings_requires_auth_secret_when_security_enabled() -> None:
-    settings = Settings(enable_security=True, auth_token_secret_key=None)
+def test_startup_settings_requires_supabase_url_when_security_enabled() -> None:
+    settings = Settings(enable_security=True, supabase_url=None, supabase_anon_key="anon")
 
-    with pytest.raises(SettingsConfigurationError, match="AUTH_TOKEN_SECRET_KEY"):
+    with pytest.raises(SettingsConfigurationError, match="SUPABASE_URL"):
         validate_startup_settings(settings)
 
 
-def test_startup_settings_rejects_short_auth_secret() -> None:
-    settings = Settings(enable_security=True, auth_token_secret_key="short")
-
-    with pytest.raises(SettingsConfigurationError, match="at least"):
-        validate_startup_settings(settings)
-
-
-def test_startup_settings_rejects_non_positive_token_ttl() -> None:
+def test_startup_settings_requires_supabase_anon_key_when_security_enabled() -> None:
     settings = Settings(
         enable_security=True,
-        auth_token_secret_key="a" * 64,
-        auth_token_ttl_seconds=0,
+        supabase_url="https://example.supabase.co",
+        supabase_anon_key=None,
     )
 
-    with pytest.raises(SettingsConfigurationError, match="positive"):
+    with pytest.raises(SettingsConfigurationError, match="SUPABASE_ANON_KEY"):
+        validate_startup_settings(settings)
+
+
+def test_startup_settings_rejects_non_positive_supabase_timeout() -> None:
+    settings = Settings(
+        enable_security=True,
+        supabase_url="https://example.supabase.co",
+        supabase_anon_key="anon",
+        supabase_auth_timeout_seconds=0,
+    )
+
+    with pytest.raises(SettingsConfigurationError, match="SUPABASE_AUTH_TIMEOUT_SECONDS"):
         validate_startup_settings(settings)
 
 

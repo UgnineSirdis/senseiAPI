@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
 from audio import router as audio_router
-from auth.router import get_current_user
+from auth.dependencies import get_current_user
 from auth.router import router as auth_router
 from calendar_events import router as calendar_router
 from core.config import Settings, get_settings, validate_startup_settings

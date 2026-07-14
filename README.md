@@ -77,7 +77,9 @@ rm -rf .docker/postgres_data
 
 ```bash
 docker compose up -d db
-export ENABLE_SECURITY=true  # enable/disable authentication
+export ENABLE_SECURITY=true
+export SUPABASE_URL=https://your-project.supabase.co
+export SUPABASE_ANON_KEY=your-supabase-anon-key
 uvicorn main:app --reload
 ```
 
@@ -88,6 +90,19 @@ The API is then available at:
 - Readiness check: http://127.0.0.1:8000/ready
 - Interactive docs (Swagger UI): http://127.0.0.1:8000/docs
 - Alternative docs (ReDoc): http://127.0.0.1:8000/redoc
+
+## Auth
+
+For auth features you need to run the server with `ENABLE_SECURITY=true` option.
+
+```bash
+# Register new user
+curl -X POST 'http://127.0.0.1:8000/auth/register' -H "Content-Type: application/json" -d '{"email": "user@example.com", "password": "1234567890", "full_name": "Full Name"}'
+# After this you get email from noreply@mail.app.supabase.io and need to confirm your email address
+
+# Get user token
+curl -X POST "http://127.0.0.1:8000/auth/token" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "username=user@example.com" --data-urlencode "password=1234567890"
+```
 
 ## Quality checks
 
